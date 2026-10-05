@@ -1,0 +1,221 @@
+openapi: 3.0.3
+info:
+  title: SchoolRun Verification Service
+  version: 1.0.0
+  description: >
+    Asynchronous identity and document verification API.
+    Consumers submit subjects + documents; the pipeline extracts, matches,
+    decides, and notifies via signed webhooks + polling.
+servers:
+  - url: https://verify.schoolrun.space/api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: verifications
+paths:
+  /verifications:
+    post:
+      tags: [verifications]
+      summary: Create a verification
+      operationId: createVerification
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, maxLength: 190 }
+          description: Replays return the original verification (200 + X-Idempotent-Replay).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_reference, verification_policy, subject]
+              properties:
+                external_reference: { type: string, example: driver-12345 }
+                verification_policy: { type: string, example: schoolrun_driver_identity }
+                expected_document_type:
+                  type: string
+                  enum: [national_id, drivers_license, passport, proof_of_address, vehicle_document, other]
+                subject:
+                  type: object
+                  required: [external_id, first_name, surname]
+                  properties:
+                    type: { type: string, default: person }
+                    external_id: { type: string }
+                    first_name: { type: string }
+                    middle_names: { type: string }
+                    surname: { type: string }
+                    date_of_birth: { type: string, format: date }
+                    country: { type: string, minLength: 2, maxLength: 2, example: ZW }
+                    national_id_number: { type: string }
+                    passport_number: { type: string }
+                    driver_license_number: { type: string }
+                    gender: { type: string }
+                documents:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type: { type: string }
+                      side: { type: string, enum: [front, back] }
+                      file_base64: { type: string, description: base64 document bytes (JPEG/PNG/WEBP/HEIC/PDF) }
+                callback:
+                  type: object
+                  properties:
+                    url: { type: string, format: uri }
+      responses:
+        '202':
+          description: Accepted — processing asynchronously
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Verification' }
+        '200': { description: Idempotent replay of an existing verification }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /verifications/{verification_id}:
+    get:
+      tags: [verifications]
+      summary: Poll verification status
+      parameters: [{ $ref: '#/components/parameters/verificationId' }]
+      responses:
+        '200':
+          description: Current state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Verification' }
+        '404': { description: Not found (or owned by another consumer) }
+  /verifications/{verification_id}/result:
+    get:
+      tags: [verifications]
+      summary: Rich verification result
+      parameters: [{ $ref: '#/components/parameters/verificationId' }]
+      responses:
+        '200':
+          description: Field-level result, reason codes, confidences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationResult' }
+        '404': { description: Not found }
+  /verifications/{verification_id}/retry:
+    post:
+      tags: [verifications]
+      summary: Re-queue a failed/errored verification
+      parameters: [{ $ref: '#/components/parameters/verificationId' }]
+      responses:
+        '202': { description: Re-queued }
+        '409': { description: Not retryable in current state }
+  /verifications/{verification_id}/cancel:
+    post:
+      tags: [verifications]
+      summary: Cancel a non-terminal verification
+      parameters: [{ $ref: '#/components/parameters/verificationId' }]
+      responses:
+        '200': { description: Cancelled }
+        '409': { description: Already terminal }
+  /verifications/{verification_id}/documents:
+    post:
+      tags: [verifications]
+      summary: Attach a document to an awaiting_documents verification
+      parameters: [{ $ref: '#/components/parameters/verificationId' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: { type: string }
+                side: { type: string, enum: [front, back] }
+                file_base64: { type: string }
+                complete: { type: boolean, default: true }
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                type: { type: string }
+                side: { type: string, enum: [front, back] }
+      responses:
+        '202': { description: Accepted; processing begins when complete }
+        '409': { description: Verification not accepting documents }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "{key_id}.{secret} issued per consumer"
+  parameters:
+    verificationId:
+      name: verification_id
+      in: path
+      required: true
+      schema: { type: string, example: ver_01M45JBGNWCDXJ65QEK3XFFNHY }
+  schemas:
+    Verification:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            verification_id: { type: string }
+            external_reference: { type: string }
+            policy: { type: string }
+            status:
+              type: string
+              enum: [pending, awaiting_documents, processing, review_required,
+                     verified, partially_verified, failed, rejected, expired, error, cancelled]
+            reason_codes: { type: array, items: { type: string } }
+            confidence: { type: number, nullable: true }
+            poll_url: { type: string }
+            created_at: { type: string, format: date-time }
+            completed_at: { type: string, format: date-time, nullable: true }
+            verified_until: { type: string, format: date-time, nullable: true }
+    VerificationResult:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            verification_id: { type: string }
+            status: { type: string }
+            result:
+              type: object
+              properties:
+                overall_confidence: { type: number }
+                document_type: { type: string, nullable: true }
+                document_country: { type: string, nullable: true }
+                identity_match: { type: boolean, nullable: true }
+                fields:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      match: { type: boolean, nullable: true }
+                      confidence: { type: number }
+                      reason: { type: string }
+                      provided: { type: boolean }
+                reasons: { type: array, items: { type: string } }
+                authenticity_signals: { type: array, items: { type: string } }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Unauthorized:
+      description: Missing/invalid API credentials
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Policy not allowed for consumer
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ValidationError:
+      description: Validation failed
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    RateLimited:
+      description: Rate limit exceeded; Retry-After header present
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

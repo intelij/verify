@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Enums;
+
+/**
+ * Stable business-level reason codes exposed to API consumers.
+ * Internal provider/ML detail must never leak through these codes.
+ */
+final class ReasonCode
+{
+    public const FIRST_NAME_MATCH = 'FIRST_NAME_MATCH';
+    public const SURNAME_MATCH = 'SURNAME_MATCH';
+    public const MIDDLE_NAMES_MATCH = 'MIDDLE_NAMES_MATCH';
+    public const DATE_OF_BIRTH_MATCH = 'DATE_OF_BIRTH_MATCH';
+    public const DOCUMENT_NUMBER_MATCH = 'DOCUMENT_NUMBER_MATCH';
+    public const FIRST_NAME_MISMATCH = 'FIRST_NAME_MISMATCH';
+    public const SURNAME_MISMATCH = 'SURNAME_MISMATCH';
+    public const DOB_MISMATCH = 'DOB_MISMATCH';
+    public const DOCUMENT_NUMBER_MISMATCH = 'DOCUMENT_NUMBER_MISMATCH';
+    public const FIELD_NOT_EXTRACTED = 'FIELD_NOT_EXTRACTED';
+    public const FIELD_NOT_PROVIDED = 'FIELD_NOT_PROVIDED';
+    public const LOW_EXTRACTION_CONFIDENCE = 'LOW_EXTRACTION_CONFIDENCE';
+    public const DOCUMENT_EXPIRED = 'DOCUMENT_EXPIRED';
+    public const DOCUMENT_UNREADABLE = 'DOCUMENT_UNREADABLE';
+    public const REUPLOAD_REQUIRED = 'REUPLOAD_REQUIRED';
+    public const DOCUMENT_TYPE_MISMATCH = 'DOCUMENT_TYPE_MISMATCH';
+    public const DOCUMENT_TYPE_UNKNOWN = 'DOCUMENT_TYPE_UNKNOWN';
+    public const DOCUMENT_TYPE_NOT_ALLOWED = 'DOCUMENT_TYPE_NOT_ALLOWED';
+    public const DOCUMENT_AUTHENTICITY_FAILED = 'DOCUMENT_AUTHENTICITY_FAILED';
+    public const DOCUMENT_NUMBER_INVALID = 'DOCUMENT_NUMBER_INVALID';
+    public const MANUAL_REVIEW_REQUIRED = 'MANUAL_REVIEW_REQUIRED';
+    public const MANUAL_REVIEW_APPROVED = 'MANUAL_REVIEW_APPROVED';
+    public const MANUAL_REVIEW_REJECTED = 'MANUAL_REVIEW_REJECTED';
+    public const RISK_FLAG = 'RISK_FLAG';
+    public const DUPLICATE_DOCUMENT = 'DUPLICATE_DOCUMENT';
+    public const PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE';
+    public const PROCESSING_ERROR = 'PROCESSING_ERROR';
+    public const CANCELLED_BY_CONSUMER = 'CANCELLED_BY_CONSUMER';
+}
