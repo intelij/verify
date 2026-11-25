@@ -30,6 +30,8 @@ class VerificationResultResource extends JsonResource
                 'document_country' => $extraction?->country,
                 'identity_match' => $this->computeIdentityMatch(),
                 'fields' => $fields,
+                'extracted' => $this->extractedSummary($extraction),
+                'document_expiry' => $extraction?->fields['expiry_date'] ?? null,
                 'reasons' => $this->reason_codes ?? [],
                 'authenticity_signals' => $extraction?->signals ?? [],
             ],
@@ -39,6 +41,33 @@ class VerificationResultResource extends JsonResource
             'completed_at' => $this->completed_at?->toIso8601String(),
             'verified_until' => $this->verified_until?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Extracted field values for the consuming backend — it submitted the
+     * document and owns the subject record. Identifier values are masked to
+     * the last 4 chars; names/dates are returned in full so the consumer can
+     * store the extraction summary. Raw OCR text is never included.
+     */
+    private function extractedSummary($extraction): ?array
+    {
+        if (! $extraction || ! is_array($extraction->fields)) {
+            return null;
+        }
+        $identifierFields = ['document_number', 'national_id_number',
+            'passport_number', 'driver_license_number', 'license_number'];
+
+        $out = [];
+        foreach ($extraction->fields as $field => $value) {
+            if (! is_string($value) || $value === '') {
+                continue;
+            }
+            $out[$field] = in_array($field, $identifierFields, true)
+                ? \App\Support\PiiMasker::mask($value)
+                : $value;
+        }
+
+        return $out === [] ? null : $out;
     }
 
     private function computeIdentityMatch(): ?bool
